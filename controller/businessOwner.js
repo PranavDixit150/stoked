@@ -2,6 +2,7 @@ const path = require("path");
 const db = require("../connection/db");
 
 module.exports = {
+  // ------------------------------------Start Crete Business Owner Api----------------------------------
   createOwner: async (req, res) => {
     try {
       const {
@@ -105,7 +106,9 @@ module.exports = {
       return res.status(500).send("Internal Server Error");
     }
   },
+  // ------------------------------------ End Crete Business Owner Api----------------------------------
 
+  // --------------------------------------Start Owner login----------------------------------------
   logInOwner: async (req, res) => {
     try {
       const { ownerEmail, ownerPassword } = req.body;
@@ -134,4 +137,63 @@ module.exports = {
       console.log(error);
     }
   },
+  // --------------------------------------End Owner login----------------------------------------
+
+  // --------------------------------------Start Crete Business Api----------------------------------------
+  createBusiness: async (req, res) => {
+    try {
+      const {
+        businessName,
+        businessDescription,
+        businessLocation,
+        longitude,
+        latitude,
+        openingTime,
+        closingTime,
+      } = req.body;
+
+      if (
+        !businessName ||
+        !businessDescription ||
+        !businessLocation ||
+        !longitude ||
+        !latitude ||
+        !openingTime ||
+        !closingTime
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Please fill all required fields" });
+      }
+
+      const dbData = [
+        businessName,
+        businessDescription,
+        businessLocation,
+        latitude,
+        longitude,
+        openingTime,
+        closingTime,
+      ];
+
+      db.query(
+        "INSERT INTO business (businessName, businessDescription, businessLocation, latitude, longitude, openingTime, closingTime) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        dbData,
+        (err, result) => {
+          if (err) {
+            console.error(err);
+            return res
+              .status(500)
+              .send("Error in inserting data into database");
+          }
+          console.log("Data received from MySQL:", result);
+          return res.json({ message: result });
+        }
+      );
+    } catch (error) {
+      console.error(error);
+      return res.status(500).send("Internal Server Error");
+    }
+  },
+  // --------------------------------------End Crete Business Api------------------------------------------
 };
