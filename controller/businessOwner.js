@@ -1,11 +1,18 @@
 const path = require("path");
 const db = require("../connection/db");
+const jwt = require("jsonwebtoken");
+
+var dotenv = require("dotenv");
+dotenv.config();
+
+const SECRET = process.env.SECRET;
 
 module.exports = {
   // ------------------------------------Start Crete Business Owner Api----------------------------------
   createOwner: async (req, res) => {
     try {
       const {
+        businessId,
         ownerName,
         ownerEmail,
         ownerPhoneNumber,
@@ -20,9 +27,11 @@ module.exports = {
         isPhoneVeryfied,
         accountStatus,
         deviceType,
+        deviceToken,
       } = req.body;
 
       // if (
+      //   !businessId ||
       //   !ownerName ||
       //   !ownerEmail ||
       //   !ownerPhoneNumber ||
@@ -69,8 +78,8 @@ module.exports = {
           }
         });
       }
-
       const dbData = [
+        parseInt(businessId),
         ownerName,
         ownerEmail,
         ownerPhoneNumber,
@@ -85,20 +94,31 @@ module.exports = {
         isPhoneVeryfied,
         accountStatus,
         deviceType,
+        deviceToken,
       ];
-
+      console.log("db dat ==================>", dbData);
       db.query(
-        "INSERT INTO businessOwner (ownerName, ownerEmail, ownerPhoneNumber, ownerDOB, ownerImage, ownerPassword, ownerRole, ownerLocation, latitude, longitude, isEmailVeryfied, isPhoneVeryfied, accountStatus, deviceType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO businessOwner (businessId, ownerName, ownerEmail, ownerPhoneNumber, ownerDOB, ownerImage, ownerPassword, ownerRole, ownerLocation, latitude, longitude, isEmailVeryfied, isPhoneVeryfied, accountStatus, deviceType, deviceToken) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         dbData,
-        (err, result) => {
+        async (err, result) => {
           if (err) {
             console.error(err);
             return res
               .status(500)
               .send("Error in inserting data into database");
           }
-          console.log("Data received from MySQL:", result);
-          return res.json({ message: result });
+          const authToken = jwt.sign({ ownerEmail }, SECRET, {
+            expiresIn: "1h",
+          });
+          db.query(
+            `Update businessOwner set authToken = '${authToken}' where ownerEmail = '${ownerEmail}'`,
+            [authToken]
+          );
+          console.log(authToken, SECRET, "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-");
+          return res.json({
+            message: result,
+            token: authToken,
+          });
         }
       );
     } catch (error) {
@@ -106,9 +126,7 @@ module.exports = {
       return res.status(500).send("Internal Server Error");
     }
   },
-  // ------------------------------------ End Crete Business Owner Api----------------------------------
 
-  // --------------------------------------Start Owner login----------------------------------------
   logInOwner: async (req, res) => {
     try {
       const { ownerEmail, ownerPassword } = req.body;
