@@ -4,7 +4,7 @@ var cookieParser = require("cookie-parser");
 var fileupload = require("express-fileupload");
 var logger = require("morgan");
 var db = require("./connection/db");
-// const dotenv = require("dotenv");
+const dotenv = require("dotenv").config({});
 // var port = process.env.PORT;
 
 const port = 8001;

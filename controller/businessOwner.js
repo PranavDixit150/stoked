@@ -1,6 +1,10 @@
 const path = require("path");
 const db = require("../connection/db");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const randomstring = require("randomstring");
+const emailMamanger = require("../helpers/sendMail");
+var otp = Math.floor(1000 + Math.random() * 9000);
 
 var dotenv = require("dotenv");
 dotenv.config();
@@ -62,6 +66,8 @@ module.exports = {
       //   return res.status(400).json({ message: "Invalid phone number format" });
       // }
 
+      const hashedPassword = await bcrypt.hash(ownerPassword, 10);
+
       let ownerImageName = "";
       if (req.files && req.files.ownerImage) {
         const ownerImageFile = req.files.ownerImage;
@@ -78,6 +84,7 @@ module.exports = {
           }
         });
       }
+
       const dbData = [
         parseInt(businessId),
         ownerName,
@@ -85,7 +92,7 @@ module.exports = {
         ownerPhoneNumber,
         ownerDOB,
         ownerImageName,
-        ownerPassword,
+        hashedPassword,
         ownerRole,
         ownerLocation,
         latitude,
@@ -97,6 +104,7 @@ module.exports = {
         deviceToken,
       ];
       console.log("db dat ==================>", dbData);
+
       db.query(
         "INSERT INTO businessOwner (businessId, ownerName, ownerEmail, ownerPhoneNumber, ownerDOB, ownerImage, ownerPassword, ownerRole, ownerLocation, latitude, longitude, isEmailVeryfied, isPhoneVeryfied, accountStatus, deviceType, deviceToken) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         dbData,
@@ -114,11 +122,11 @@ module.exports = {
             `Update businessOwner set authToken = '${authToken}' where ownerEmail = '${ownerEmail}'`,
             [authToken]
           );
-          console.log(authToken, SECRET, "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-");
-          return res.json({
+          res.json({
             message: result,
             token: authToken,
           });
+          emailMamanger.sendOTP(ownerEmail, "Account verify OTP");
         }
       );
     } catch (error) {
@@ -130,21 +138,22 @@ module.exports = {
   logInOwner: async (req, res) => {
     try {
       const { ownerEmail, ownerPassword } = req.body;
+      const hashedPassword = await bcrypt.hash(ownerPassword, 10);
+
       console.log(req.body, "hjdahsgcdhsdcfaswd");
       if (!ownerEmail || !ownerPassword) {
         return res
           .status(400)
           .json({ message: "Username and password are required." });
       }
-
       db.query(
         "SELECT * FROM businessOwner WHERE ownerEmail = ? AND ownerPassword = ?",
-        [ownerEmail, ownerPassword],
+        [ownerEmail, hashedPassword],
         (err, results) => {
           if (err) {
             throw err;
           }
-          if (results.length > 0) {
+          if (results) {
             res.json({ message: "Login successful" });
           } else {
             res.status(401).json({ message: "Invalid credentials" });
