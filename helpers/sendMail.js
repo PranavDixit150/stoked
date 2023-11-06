@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 const { SMTP_MAIL, SMTP_PASSWORD } = process.env;
-var otp = Math.floor(1000 + Math.random() * 9000);
+
 const emailSender = async (to, subject, html) => {
   console.log("cred =====", SMTP_MAIL, SMTP_PASSWORD);
   try {
@@ -31,9 +31,12 @@ module.exports = {
   sendEmail: emailSender,
   sendOTP: async (to, subject) => {
     try {
+      var otp = Math.floor(1000 + Math.random() * 9000);
       console.log("details ======>", to, subject);
+      console.log(otp,">>>>>>>>>>>>>>>>>otp>>>>>>>>>>>>>>>>>>")
       const html = `<h1>Your OTP is : - ${otp}</h1>`;
       const res = await emailSender(to, subject, html);
+      return otp;
     } catch (err) {
       throw err;
     }

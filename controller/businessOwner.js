@@ -2,11 +2,12 @@ const path = require("path");
 const db = require("../connection/db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const randomstring = require("randomstring");
+// const randomstring = require("randomstring");
 const emailMamanger = require("../helpers/sendMail");
-var otp = Math.floor(1000 + Math.random() * 9000);
+// const otp = Math.floor(1000 + Math.random() * 9000);
 
 var dotenv = require("dotenv");
+const { log } = require("console");
 dotenv.config();
 
 const SECRET = process.env.SECRET;
@@ -32,6 +33,7 @@ module.exports = {
         accountStatus,
         deviceType,
         deviceToken,
+        otp,
       } = req.body;
 
       // if (
@@ -46,8 +48,8 @@ module.exports = {
       //   !ownerLocation ||
       //   !latitude ||
       //   !longitude ||
-      //   !isEmailVeryfied ||
-      //   !isPhoneVeryfied ||
+      //   isEmailVeryfied !== true ||
+      //   isPhoneVeryfied !== true ||
       //   !accountStatus ||
       //   !deviceType
       // ) {
@@ -85,6 +87,23 @@ module.exports = {
         });
       }
 
+      // let ownerImageName = "";
+      // if (req.files && req.files.ownerImage) {
+      //   const ownerImageFile = req.files.ownerImage;
+      //   ownerImageName = ownerImageFile.name;
+      //   const uploadDir = path.join(
+      //     __dirname,
+      //     "../public/images",
+      //     ownerImageName
+      //   );
+      //   ownerImageFile.mv(uploadDir, (err) => {
+      //     if (err) {
+      //       console.error(err);
+      //       return res.status(500).send("Error in uploading image");
+      //     }
+      //   });
+      // }
+
       const dbData = [
         parseInt(businessId),
         ownerName,
@@ -102,11 +121,12 @@ module.exports = {
         accountStatus,
         deviceType,
         deviceToken,
+        otp,
       ];
       console.log("db dat ==================>", dbData);
 
       db.query(
-        "INSERT INTO businessOwner (businessId, ownerName, ownerEmail, ownerPhoneNumber, ownerDOB, ownerImage, ownerPassword, ownerRole, ownerLocation, latitude, longitude, isEmailVeryfied, isPhoneVeryfied, accountStatus, deviceType, deviceToken) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO businessOwner (businessId, ownerName, ownerEmail, ownerPhoneNumber, ownerDOB, ownerImage, ownerPassword, ownerRole, ownerLocation, latitude, longitude, isEmailVeryfied, isPhoneVeryfied, accountStatus, deviceType, deviceToken, otp) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         dbData,
         async (err, result) => {
           if (err) {
@@ -126,7 +146,14 @@ module.exports = {
             message: result,
             token: authToken,
           });
-          emailMamanger.sendOTP(ownerEmail, "Account verify OTP");
+          const otp = await emailMamanger.sendOTP(
+            ownerEmail,
+            "Account verify OTP"
+          );
+          console.log("otp =======>");
+          db.query(
+            `update businessOwner set otp = '${otp}'  where ownerEmail = '${ownerEmail}' `
+          );
         }
       );
     } catch (error) {
@@ -153,11 +180,33 @@ module.exports = {
           if (err) {
             throw err;
           }
-          if (results) {
-            res.json({ message: "Login successful" });
-          } else {
-            res.status(401).json({ message: "Invalid credentials" });
-          }
+
+          const result = new Promise((res, rej) => {
+            db.query(
+              `SELECT authToken FROM businessOwner WHERE ownerEmail = '${ownerEmail}'`,
+              async (error, token) => {
+                if (token) {
+                  res(token);
+                }
+                if (error) {
+                  rej(null);
+                }
+                console.log(token, "tokenoooooooooooooooooooo");
+              }
+            );
+          });
+
+          const ownerToken = jwt.sign({ ownerEmail }, SECRET, {
+            expiresIn: "1h",
+          });
+          console.log(ownerToken, "ownerTokennb");
+          // if (token === ownerToken) {
+          //   if (results) {
+          //     res.json({ message: "Login successful" });
+          //   } else {
+          //     res.status(401).json({ message: "Invalid credentials" });
+          //   }
+          // }
         }
       );
     } catch (error) {
@@ -223,4 +272,240 @@ module.exports = {
     }
   },
   // --------------------------------------End Crete Business Api------------------------------------------
+  createEvent: async (req, res) => {
+    try {
+      const {
+        ownerId,
+        businessId,
+        eventName,
+        description,
+        image,
+        location,
+        longitude,
+        latitude,
+        time,
+        date,
+        whyAttend,
+        termCondition,
+      } = req.body;
+
+      if (
+        !ownerId ||
+        !businessId ||
+        !eventName ||
+        !description ||
+        !location ||
+        !longitude ||
+        !latitude ||
+        !time ||
+        !date ||
+        !whyAttend ||
+        !termCondition
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Please fill all required fields" });
+      }
+      // let ownerImageName = "";
+      // if (req.files && req.files.ownerImage) {
+      //   const ownerImageFile = req.files.ownerImage;
+      //   ownerImageName = ownerImageFile.name;
+      //   const uploadDir = path.join(
+      //     __dirname,
+      //     "../public/images",
+      //     ownerImageName
+      //   );
+      //   ownerImageFile.mv(uploadDir, (err) => {
+      //     if (err) {
+      //       console.error(err);
+      //       return res.status(500).send("Error in uploading image");
+      //     }
+      //   });
+      // }
+
+      let eventImage = "";
+      if (req.files && req.files.image) {
+        const ImageFile = req.files.image;
+        eventImage = ImageFile.name;
+        const uploadDir = path.join(__dirname, "../public/images", eventImage);
+        ImageFile.mv(uploadDir, (err) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).send("Error in uploading image");
+          }
+        });
+      }
+
+      const dbData = [
+        ownerId,
+        businessId,
+        eventName,
+        description,
+        eventImage,
+        location,
+        longitude,
+        latitude,
+        time,
+        date,
+        whyAttend,
+        termCondition,
+      ];
+
+      db.query(
+        "INSERT INTO events (ownerId, businessId, eventName, description, image, location, longitude, latitude, time, date, whyAttend, termCondition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        dbData,
+        (err, result) => {
+          if (err) {
+            console.error(err);
+            return res
+              .status(500)
+              .send("Error in inserting data into database");
+          }
+          console.log("Data received from MySQL:", result);
+          return res.json({ message: result });
+        }
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  },
+
+  // --------------------------------------Start Edit Event Api------------------------------------------
+
+  editEvent: async (req, res) => {
+    try {
+      const {
+        ownerId,
+        businessId,
+        eventName,
+        description,
+        image,
+        location,
+        longitude,
+        latitude,
+        time,
+        date,
+        whyAttend,
+        termCondition,
+      } = req.body;
+
+      let eventImage = "";
+      if (req.files && req.files.image) {
+        const ImageFile = req.files.image;
+        eventImage = ImageFile.name;
+        const uploadDir = path.join(__dirname, "../public/images", eventImage);
+        ImageFile.mv(uploadDir, (err) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).send("Error in uploading image");
+          }
+        });
+      }
+
+      const eventId = req.params.eventId;
+      db.query(
+        `UPDATE events SET ownerId = ?, businessId = ?, eventName = ?, description = ?, image = ?, location = ?, longitude = ?, latitude = ?, time = ?, date = ?, whyAttend = ?, termCondition = ? WHERE eventId = ?`,
+        [
+          ownerId,
+          businessId,
+          eventName,
+          description,
+          eventImage,
+          location,
+          longitude,
+          latitude,
+          time,
+          date,
+          whyAttend,
+          termCondition,
+          eventId,
+        ]
+      );
+
+      res.status(200).json({ message: "Event updated successfully" });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+  // ------------------------------------ delete event -------------------------->>>>>>>>>>
+  deleteEvent: async (req, res) => {
+    try {
+      const eventId = req.params.eventId;
+
+      const result = await new Promise((res, rej) => {
+        db.query(
+          `SELECT eventId FROM events WHERE eventId = '${eventId}'`,
+          (error, data) => {
+            if (data) {
+              res(data);
+            }
+            if (error) {
+              rej(null);
+            }
+          }
+        );
+      });
+      console.log(result, "JDDHDHGUGHDKSJFUDUURFTEFHU4");
+      if (result[0]) {
+        await db.query(`DELETE FROM events WHERE eventId = '${eventId}'`);
+
+        res.status(200).json({ message: "Event deleted successfully" });
+      } else {
+        return res.status(404).json({ message: "Event not found" });
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+
+  createInventory: async (req, res) => {
+    try {
+      const {businessId, businessOwnerId, eventId, image, description, location, longitude, latitude, category, subCategory, quantity } = req.body;
+
+      let inventoryImage = ""
+      if(req.files && req.files.image){
+        const imageFile = req.files.image
+        inventoryImage = imageFile.name
+        const uploadDir = path.join(__dirname, "../public/images", inventoryImage)
+        imageFile.mv(uploadDir, (err) => {
+          if(err){
+            console.error(err)
+            return res
+            .status(500)
+            .send("Error in uploading image")
+          }
+        })
+      }
+
+      const dbData = [
+        businessId,
+        businessOwnerId,
+        eventId,
+        description,
+        inventoryImage,
+        location,
+        longitude,
+        latitude,
+        category,
+        subCategory,
+        quantity,
+      ];
+      console.log(dbData, "fchdfhdjwhfudfugfdchwufgwdjcbdfgwdhbcouwdetfdnbfow7e");
+
+      db.query ("insert into inventory (businessId, businessOwnerId, eventId, image, description, location, longitude, latitude, category, subCategory, quantity) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
+      dbData, (err, res) => {
+        if(err) {
+          console.error(err)
+          return res
+          .status(500)
+          .send("Error in inserting data")
+        }
+        console.log("Data insertied successfully...")
+      }
+    } catch (error) {
+      console.log(error,  "Error");
+    }
+  }
 };

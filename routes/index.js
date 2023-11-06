@@ -4,4 +4,8 @@ const ownerController = require("../controller/businessOwner");
 router.post("/createOwner", ownerController.createOwner);
 router.post("/createBusiness", ownerController.createBusiness);
 router.post("/logInOwner", ownerController.logInOwner);
+router.post("/createevent", ownerController.createEvent);
+router.put("/editEvent/:eventId", ownerController.editEvent);
+router.delete("/deleteEvent/:eventId", ownerController.deleteEvent);
+router.post("/createInventory", ownerController.createInventory);
 module.exports = router;
